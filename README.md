@@ -1,4 +1,4 @@
-# homebridge-eNet
+# homebridge-enet
 
 Gira/Jung eNet plugin for homebridge: https://github.com/nfarina/homebridge
 
@@ -9,7 +9,7 @@ Gira/Jung eNet plugin for homebridge: https://github.com/nfarina/homebridge
 # Installation
 
 1. Install homebridge using: `npm install -g homebridge`
-2. Install this plugin using: `npm install -g homebridge-eNet`
+2. Install this plugin using: `npm install -g https://github.com/ChristophFausak/homebridge-enet`
 3. Update your configuration file. See the sample below.
 
 # Configuration

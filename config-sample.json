@@ -1,0 +1,17 @@
+{
+    "bridge": {
+        "name": "Homebridge2",
+        "username": "CC:22:3D:E3:CE:32",
+        "port": 51826,
+        "pin": "031-45-155"
+    },
+
+    "description": "eNet Platform",
+
+    "platforms": [
+            {
+              "platform": "eNet Platform",
+              "name": "eNet",
+            }   
+        ]
+}

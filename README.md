@@ -21,15 +21,8 @@ Configuration sample:
  ```javascript
 
      "platforms": [
-             {
-               "platform": "eNet",
-               "name": "eNet platform",
-               "gateways" : ["1.1.1.1", "myGateway.local"]
-             }   
-         ]
-     "platforms": [
          {
-             "platform": "eNet Platform",
+             "platform": "eNetPlatform",
              "name": "eNet",
              "autodiscover": true,
              "gateways": [{
@@ -40,7 +33,7 @@ Configuration sample:
                      {
                          "channel": 16,
                          "name": "Kitchen",
-                         "type": "Shutter",
+                         "type": "Shutter"
                      }
                  ]
              }]

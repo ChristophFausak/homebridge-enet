@@ -2,11 +2,12 @@
 
 const eNet = require('node-enet-api');
 
-var Service, Characteristic, UUIDGen;
+var Service, Characteristic, Accessory, UUIDGen;
 
 module.exports = function (homebridge) {
     Service = homebridge.hap.Service;
     Characteristic = homebridge.hap.Characteristic;
+    Accessory = homebridge.platformAccessory;
     UUIDGen = homebridge.hap.uuid;
 
     homebridge.registerPlatform("homebridge-eNet", "eNetPlatform", eNetPlatform); //, true);
@@ -60,18 +61,6 @@ eNetPlatform.prototype.newGateway = function (gw) {
 };
 
 eNetPlatform.prototype.setupDevices = function() {
-    // connect cached accessories to gateways
-    for (var i = 0; i < this.accessories.length; ++i) {
-        var acessory = this.accessories[i];
-        if (!accessories.gateway) {
-            if (accessory.gateway = this.findGateway(accessory.context.gateID)) {
-                accessory.reachable = true;
-            }
-        }
-    }
-
-    var addedDevices = false;
-
     if (Array.isArray(this.config.gateways)) {
         for (var i = 0; i < this.config.gateways.length; ++i) {
             var gw = this.config.gateways[i];
@@ -83,6 +72,8 @@ eNetPlatform.prototype.setupDevices = function() {
 
                 if (!g && gw.host) {
                     g = new eNet.gateway(gw);
+                    ++this.loadState;
+
                     g.getChannelInfo(function(err, res) {
                         if (!err)
                         {
@@ -96,33 +87,51 @@ eNetPlatform.prototype.setupDevices = function() {
                         if (err) this.log.warn("Failed to get gateway channels, ignoring gateway. Error: " + err);
                         if (--this.loadState === 0) this.setupDevices();
                     }.bind(this));
+
+                    return;
                 }
 
                 if (g) {
-                    for (var j = 0; j < gw.accessories; ++j) {
+                    for (var j = 0; j < gw.accessories.length; ++j) {
                         var acc = gw.accessories[j];
 
-                        a = findAccessory(g.id, acc.channel);
-                        if (a && a.context.type != acc.type) {
-                            // kick this accessory out, create new one
-                            a.reachable = false;
-                            this.createAccessory(g.id, acc);
+                        var a = this.findAccessory(g.id, acc.channel);
+                        if (a) {
+                            if (a.context.type != acc.type) {
+                                // kick this accessory out, create new one
+                                a.reachable = false;
+                            }
+                            else if (!a.reachable) {
+                                a.gateway = g;
+                                a.reachable = true;
+                            }
+                        }
+                        else {
+                            this.createAccessory(g, acc);
                         }
                     }
                 }
-                else this.log.warn("Cannot find gateway: " + JSON.stringify(g));
+                else this.log.warn("Cannot find gateway: " + JSON.stringify(gw));
             }
+            else this.log.warn("Gateway has no accessories: " + JSON.stringify(gw));
         }
     }
+    else this.log.warn("No gateways defined: " + JSOM.stringify(this.config));
 
     var keep = [], del = [];
     for (var i = 0; i < this.accessories.length; ++i) {
-        if (this.accessories[i].reachable) keep.push(this.accessories[i]);
-        else del.push(this.accessories[i]);
+        var acc = this.accessories[i];
+        if (acc.reachable) keep.push(acc);
+        else {
+            this.log.info("Deleting old accessory: " + JSON.stringify(acc.context));
+            del.push(acc);
+        }
     }
 
     this.accessories = keep;
     if (del.length) this.api.unregisterPlatformAccessories("homebridge-eNet", "eNetPlatform", del);
+
+    this.log.info("Platform initialization finishd: " + this.accessories.length + " accessories available.");
 }
 
 eNetPlatform.prototype.findGateway = function(id) {
@@ -135,18 +144,19 @@ eNetPlatform.prototype.findGateway = function(id) {
 eNetPlatform.prototype.findAccessory = function(gateID, channel) {
     for (var i = 0; i < this.accessories.length; ++i) {
         var a = this.accessories[i];
-        if ((a.context.gateID === gateID) && (a.context === channel)) return a;
+        if ((a.context.gateID === gateID) && (a.context.channel === channel)) return a;
     }
 }
 
 eNetPlatform.prototype.configureAccessory = function(accessory) {
+    this.log.info("Configure accessory: " + JSON.stringify(accessory.context));
     if (this.setupAccessory(accessory)) {
+        accessory.reachable = false;
         this.accessories.push(accessory);
     }
 }
 
-eNetPlatform.prototype.createAccessory = function(gateID, conf) {
-    this.log.info("createShutterAccessory");
+eNetPlatform.prototype.createAccessory = function(gate, conf) {
     var uuid;
 
     if (!conf.name || (typeof conf.channel !== 'number')) {
@@ -154,7 +164,9 @@ eNetPlatform.prototype.createAccessory = function(gateID, conf) {
         return;
     }
 
-    uuid = UUIDGen.generate(conf.name);
+    this.log.info("Creating accessory: " + JSON.stringify(conf));
+
+    uuid = UUIDGen.generate(JSON.stringify(conf));
 
     var accessory = new Accessory(conf.name, uuid);
 
@@ -172,17 +184,19 @@ eNetPlatform.prototype.createAccessory = function(gateID, conf) {
         return;
     }
 
-    accessory.context.gateID = gateID;
+    accessory.context.gateID = gate.id;
     accessory.context.type = conf.type;
     accessory.context.channel = conf.channel;
 
     if (this.setupAccessory(accessory)) {
+        accessory.reachable = true;
+        accessory.gateway = gate;
         this.accessories.push(accessory);
         this.api.registerPlatformAccessories("homebridge-eNet", "eNetPlatform", [accessory]);
     }
 }
 
-function setupAccessory(accessory) {
+eNetPlatform.prototype.setupAccessory = function(accessory) {
     var service;
 
     accessory.log = this.log;
@@ -221,18 +235,16 @@ function setupAccessory(accessory) {
           .value = this.positionState;
 
     }
-    else return false;
+    else
+    {
+        this.log.warn("Cannot configure accessory, no service found. " + JSON.stringify(accessory.context));
+        return false;
+    }
 
     accessory.on('identify', function(paired, callback) {
         this.log.info("Identify: " + JSON.stringify(this.context));
         callback();
     }.bind(accessory));
-
-
-    if (accessory.gateway = this.findGateway(accessory.context.gateID)) {
-        accessory.reachable = true;
-    }
-    else accessory.reachable = false;
 
     return true;
 }
@@ -286,8 +298,15 @@ function setOn(position, callback) {
     return;
   }
 
-  this.gateway.setValue(this.context.channel, position, false, callback);
-
-// todo
-  callback(null);
+  this.log.info("Setting " + this.name + " to " + position === true ? "on" : "off");
+  this.gateway.setValue(this.context.channel, position, false, function(err, res) {
+      if (err) {
+          this.log.warn("Error setting " + this.name + " to " + position === true ? "on" : "off" + ": " + err);
+          callback(err);
+      }
+      else {
+          this.log.info("Succeeded setting " + this.name + " to " + position === true ? "on" : "off" + ": " + JSON.stringify(res));
+          callback(null);
+      }
+  });
 }

@@ -187,6 +187,7 @@ eNetPlatform.prototype.createAccessory = function(gate, conf) {
     accessory.context.gateID = gate.id;
     accessory.context.type = conf.type;
     accessory.context.channel = conf.channel;
+    accessory.context.name = conf.name;
 
     if (this.setupAccessory(accessory)) {
         accessory.reachable = true;
@@ -203,15 +204,26 @@ eNetPlatform.prototype.setupAccessory = function(accessory) {
 
     if (service = accessory.getService(Service.Lightbulb)) {
         service
-          .getCharacteristic(Characteristic.On)
+            .getCharacteristic(Characteristic.On)
 //          .on('get', getCurrentPosition.bind(accessory))
-          .on('set', setOn.bind(accessory));
+            .on('set', setOn.bind(accessory));
+
+        service
+            .getCharacteristic(Characteristic.Name)
+            .on('get', getName.bind(accessory))
+            .value = accessory.context.name || "";
     }
     else if (service = accessory.getService(Service.Switch)) {
         service
-          .getCharacteristic(Characteristic.On)
+            .getCharacteristic(Characteristic.On)
 //          .on('get', getCurrentPosition.bind(accessory))
-          .on('set', setOn.bind(accessory));
+            .on('set', setOn.bind(accessory));
+
+        service
+            .getCharacteristic(Characteristic.Name)
+            .on('get', getName.bind(accessory))
+            .value = accessory.context.name || "";
+
     }
     else if (service = accessory.getService(Service.WindowCovering)) {
         this.position = 0;
@@ -219,20 +231,25 @@ eNetPlatform.prototype.setupAccessory = function(accessory) {
         this.positionState = Characteristic.PositionState.STOPPED;
 
         service
-          .getCharacteristic(Characteristic.CurrentPosition)
-          .on('get', getCurrentPosition.bind(accessory))
-          .on('set', setCurrentPosition.bind(accessory));
+            .getCharacteristic(Characteristic.CurrentPosition)
+            .on('get', getCurrentPosition.bind(accessory))
+            .on('set', setCurrentPosition.bind(accessory));
 
         service
-          .getCharacteristic(Characteristic.TargetPosition)
-          .on('get', getTargetPosition.bind(accessory))
-          .on('set', setTargetPosition.bind(accessory));
+            .getCharacteristic(Characteristic.TargetPosition)
+            .on('get', getTargetPosition.bind(accessory))
+            .on('set', setTargetPosition.bind(accessory));
 
         service
-          .getCharacteristic(Characteristic.PositionState)
-          .on('get', getPositionState.bind(accessory))
-          .on('set', setPositionState.bind(accessory))
-          .value = this.positionState;
+            .getCharacteristic(Characteristic.PositionState)
+            .on('get', getPositionState.bind(accessory))
+            .on('set', setPositionState.bind(accessory))
+            .value = this.positionState;
+
+        service
+            .getCharacteristic(Characteristic.Name)
+            .on('get', getName.bind(accessory))
+            .value = accessory.context.name || "";
 
     }
     else
@@ -253,6 +270,10 @@ eNetPlatform.prototype.setupAccessory = function(accessory) {
 //
 //  Accessory notifications
 //
+
+function getName(callback) {
+  callback(null, this.context.name || "");
+}
 
 function getCurrentPosition(callback) {
   callback(null, this.position);
@@ -308,5 +329,5 @@ function setOn(position, callback) {
           this.log.info("Succeeded setting " + this.name + " to " + position === true ? "on" : "off" + ": " + JSON.stringify(res));
           callback(null);
       }
-  });
+  }.bind(this));
 }

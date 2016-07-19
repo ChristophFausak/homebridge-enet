@@ -1,6 +1,6 @@
 {
   "name": "homebridge-enet",
-  "version": "0.5.2",
+  "version": "0.5.3",
   "description": "Gira/Jung eNet plugin for homebridge: https://github.com/nfarina/homebridge",
   "license": "MIT",
   "keywords": [

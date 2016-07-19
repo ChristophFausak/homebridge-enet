@@ -9,9 +9,19 @@
     "description": "eNet Platform",
 
     "platforms": [
-            {
-              "platform": "eNet Platform",
-              "name": "eNet",
-            }   
-        ]
+        {
+            "platform": "eNet Platform",
+            "name": "eNet",
+            "gateways": [{
+                "name": "myGate",
+                "accessories": [
+                    {
+                        "channel": 16,
+                        "name": "Kitchen",
+                        "type": "Shutter",
+                    }
+                ]
+            }]
+        }
+    ]
 }

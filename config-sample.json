@@ -10,7 +10,7 @@
 
     "platforms": [
         {
-            "platform": "eNet Platform",
+            "platform": "eNetPlatform",
             "name": "eNet",
             "gateways": [{
                 "name": "myGate",
@@ -18,7 +18,7 @@
                     {
                         "channel": 16,
                         "name": "Kitchen",
-                        "type": "Shutter",
+                        "type": "Shutter"
                     }
                 ]
             }]

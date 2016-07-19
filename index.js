@@ -9,7 +9,7 @@ module.exports = function (homebridge) {
     Characteristic = homebridge.hap.Characteristic;
     UUIDGen = homebridge.hap.uuid;
 
-    homebridge.registerPlatform("homebridge-eNet", "eNet", eNetPlatform); //, true);
+    homebridge.registerPlatform("homebridge-eNet", "eNetPlatform", eNetPlatform); //, true);
 }
 
 
@@ -23,7 +23,7 @@ function eNetPlatform(log, config, api) {
 
     var discover = new eNet.discover();
 
-    discover.on('discover', this.newGateway});
+    discover.on('discover', function(gw) {this.newGateway(gw)}.bind(this));
 
     if (api) {
         this.api = api;
@@ -75,7 +75,7 @@ eNetPlatform.prototype.setupDevices = function() {
     if (Array.isArray(this.config.gateways)) {
         for (var i = 0; i < this.config.gateways.length; ++i) {
             var gw = this.config.gateways[i];
-            if (Array.isArray(g.accessories)) {
+            if (Array.isArray(gw.accessories)) {
                 var g;
                 if (gw.host) g = this.findGateway(gw.host);
                 if (!g && gw.mac) g = this.findGateway(gw.mac);
@@ -115,14 +115,14 @@ eNetPlatform.prototype.setupDevices = function() {
         }
     }
 
-    var keep = [], del[];
+    var keep = [], del = [];
     for (var i = 0; i < this.accessories.length; ++i) {
         if (this.accessories[i].reachable) keep.push(this.accessories[i]);
         else del.push(this.accessories[i]);
     }
 
     this.accessories = keep;
-    if (del.length) this.api.unregisterPlatformAccessories("homebridge-eNet", "eNet", del);
+    if (del.length) this.api.unregisterPlatformAccessories("homebridge-eNet", "eNetPlatform", del);
 }
 
 eNetPlatform.prototype.findGateway = function(id) {
@@ -139,7 +139,7 @@ eNetPlatform.prototype.findAccessory = function(gateID, channel) {
     }
 }
 
-SamplePlatform.prototype.configureAccessory = function(accessory) {
+eNetPlatform.prototype.configureAccessory = function(accessory) {
     if (this.setupAccessory(accessory)) {
         this.accessories.push(accessory);
     }
@@ -150,7 +150,7 @@ eNetPlatform.prototype.createAccessory = function(gateID, conf) {
     var uuid;
 
     if (!conf.name || (typeof conf.channel !== 'number')) {
-        thhis.log.warn("Cannot add accessory, invalid config: " JSON.stringify(conf));
+        this.log.warn("Cannot add accessory, invalid config: " + JSON.stringify(conf));
         return;
     }
 
@@ -168,7 +168,7 @@ eNetPlatform.prototype.createAccessory = function(gateID, conf) {
         accessory.addService(Service.Switch, "Power")
     }
     else {
-        thhis.log.warn("Cannot add accessory, invalid config: " JSON.stringify(conf));
+        this.log.warn("Cannot add accessory, invalid config: " + JSON.stringify(conf));
         return;
     }
 
@@ -178,11 +178,11 @@ eNetPlatform.prototype.createAccessory = function(gateID, conf) {
 
     if (this.setupAccessory(accessory)) {
         this.accessories.push(accessory);
-        this.api.registerPlatformAccessories("homebridge-samplePlatform", "SamplePlatform", [accessory]);
+        this.api.registerPlatformAccessories("homebridge-eNet", "eNetPlatform", [accessory]);
     }
 }
 
-function eNetPlatform.prototype.setupAccessory(accessory) {
+function setupAccessory(accessory) {
     var service;
 
     accessory.log = this.log;
@@ -193,7 +193,7 @@ function eNetPlatform.prototype.setupAccessory(accessory) {
 //          .on('get', getCurrentPosition.bind(accessory))
           .on('set', setOn.bind(accessory));
     }
-    else if (service = accessory.getService(Service.Switch) {
+    else if (service = accessory.getService(Service.Switch)) {
         service
           .getCharacteristic(Characteristic.On)
 //          .on('get', getCurrentPosition.bind(accessory))
@@ -217,7 +217,7 @@ function eNetPlatform.prototype.setupAccessory(accessory) {
         service
           .getCharacteristic(Characteristic.PositionState)
           .on('get', getPositionState.bind(accessory))
-          .on('set', setPositionState.bind(accessory)),
+          .on('set', setPositionState.bind(accessory))
           .value = this.positionState;
 
     }

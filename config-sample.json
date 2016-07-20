@@ -13,7 +13,7 @@
             "platform": "eNetPlatform",
             "name": "eNet",
             "gateways": [{
-                "name": "myGate",
+                "name": "Mobile Gate",
                 "accessories": [
                     {
                         "channel": 16,

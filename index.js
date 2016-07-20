@@ -283,7 +283,7 @@ function setTargetPosition(position, callback) {
               callback(err);
           }
           else {
-              this.log.info("Succeeded setting " + this.name + " to " + position" : " + JSON.stringify(res));
+              this.log.info("Succeeded setting " + this.name + " to " + position + " : " + JSON.stringify(res));
               callback(null);
 
               this.position = position;
@@ -322,8 +322,11 @@ function setOn(position, callback) {
           callback(null);
           if (position && this.context.duration) {
               var service = this.getService(Service.Lightbulb) || this.getService(Service.Switch);
-              if (service) setTimeout(function() {
-                  service.getCharacteristic(Characteristic.On).setValue(false);}, this.context.duration * 1ß00);
+              if (service) {
+                  setTimeout(function() {
+                  service.getCharacteristic(Characteristic.On).setValue(false);}, this.context.duration * 1000);
+              }
+          }
       }
   }.bind(this));
 }

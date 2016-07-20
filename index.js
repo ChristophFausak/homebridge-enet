@@ -101,9 +101,13 @@ eNetPlatform.prototype.setupDevices = function() {
                                 // kick this accessory out, create new one
                                 a.reachable = false;
                             }
-                            else if (!a.reachable) {
-                                a.gateway = g;
-                                a.reachable = true;
+                            else {
+                                a.context.duration = acc.duration;
+
+                                if (!a.reachable) {
+                                    a.gateway = g;
+                                    a.reachable = true;
+                                }
                             }
                         }
                         else {
@@ -171,13 +175,13 @@ eNetPlatform.prototype.createAccessory = function(gate, conf) {
     var accessory = new Accessory(conf.name, uuid);
 
     if (conf.type === "Shutter") {
-        accessory.addService(Service.WindowCovering, "Jalousie")
+        accessory.addService(Service.WindowCovering, conf.name)
     }
     else if (conf.type === "Light") {
-        accessory.addService(Service.Lightbulb, "Light")
+        accessory.addService(Service.Lightbulb, conf.name)
     }
     else if (conf.type === "Switch") {
-        accessory.addService(Service.Switch, "Power")
+        accessory.addService(Service.Switch, conf.name)
     }
     else {
         this.log.warn("Cannot add accessory, invalid config: " + JSON.stringify(conf));
@@ -187,7 +191,6 @@ eNetPlatform.prototype.createAccessory = function(gate, conf) {
     accessory.context.gateID = gate.id;
     accessory.context.type = conf.type;
     accessory.context.channel = conf.channel;
-    accessory.context.name = conf.name;
 
     if (this.setupAccessory(accessory)) {
         accessory.reachable = true;
@@ -204,52 +207,38 @@ eNetPlatform.prototype.setupAccessory = function(accessory) {
 
     if (service = accessory.getService(Service.Lightbulb)) {
         service
-            .getCharacteristic(Characteristic.On)
+          .getCharacteristic(Characteristic.On)
 //          .on('get', getCurrentPosition.bind(accessory))
-            .on('set', setOn.bind(accessory));
-
-        service
-            .getCharacteristic(Characteristic.Name)
-            .on('get', getName.bind(accessory))
-            .value = accessory.context.name || "";
+          .on('set', setOn.bind(accessory));
     }
     else if (service = accessory.getService(Service.Switch)) {
         service
-            .getCharacteristic(Characteristic.On)
+          .getCharacteristic(Characteristic.On)
 //          .on('get', getCurrentPosition.bind(accessory))
-            .on('set', setOn.bind(accessory));
-
-        service
-            .getCharacteristic(Characteristic.Name)
-            .on('get', getName.bind(accessory))
-            .value = accessory.context.name || "";
-
+          .on('set', setOn.bind(accessory));
     }
     else if (service = accessory.getService(Service.WindowCovering)) {
         this.position = 0;
         this.targetPosition = 0;
+
+        // Characteristic.PositionState.DECREASING = 0;
+        // Characteristic.PositionState.INCREASING = 1;
+        // Characteristic.PositionState.STOPPED = 2;
         this.positionState = Characteristic.PositionState.STOPPED;
 
         service
-            .getCharacteristic(Characteristic.CurrentPosition)
-            .on('get', getCurrentPosition.bind(accessory))
-            .on('set', setCurrentPosition.bind(accessory));
+          .getCharacteristic(Characteristic.CurrentPosition)
+          .on('get', getCurrentPosition.bind(accessory));
 
         service
-            .getCharacteristic(Characteristic.TargetPosition)
-            .on('get', getTargetPosition.bind(accessory))
-            .on('set', setTargetPosition.bind(accessory));
+          .getCharacteristic(Characteristic.TargetPosition)
+          .on('get', getTargetPosition.bind(accessory))
+          .on('set', setTargetPosition.bind(accessory));
 
         service
-            .getCharacteristic(Characteristic.PositionState)
-            .on('get', getPositionState.bind(accessory))
-            .on('set', setPositionState.bind(accessory))
-            .value = this.positionState;
-
-        service
-            .getCharacteristic(Characteristic.Name)
-            .on('get', getName.bind(accessory))
-            .value = accessory.context.name || "";
+          .getCharacteristic(Characteristic.PositionState)
+          .on('get', getPositionState.bind(accessory))
+          .setValue(this.positionState);
 
     }
     else
@@ -271,17 +260,8 @@ eNetPlatform.prototype.setupAccessory = function(accessory) {
 //  Accessory notifications
 //
 
-function getName(callback) {
-  callback(null, this.context.name || "");
-}
-
 function getCurrentPosition(callback) {
   callback(null, this.position);
-}
-
-function setCurrentPosition(position, callback) {
-  this.position = position;
-  callback(null);
 }
 
 function getTargetPosition(callback) {
@@ -295,22 +275,34 @@ function setTargetPosition(position, callback) {
     return;
   }
 
-  this.position = position;
+  if (position == 100 || position == 0) {
+      this.log.info("Setting " + this.name + " to " + position);
+      this.gateway.setValue(this.context.channel, position == 100, true, function(err, res) {
+          if (err) {
+              this.log.warn("Error setting " + this.name + " to " + position + ": " + err);
+              callback(err);
+          }
+          else {
+              this.log.info("Succeeded setting " + this.name + " to " + position" : " + JSON.stringify(res));
+              callback(null);
 
-  callback(null);
+              this.position = position;
+              getService(Service.WindowCovering).getCharacteristic(Characteristic.CurrentPosition).setValue(this.position);
+          }
+      }.bind(this));
+  }
+  else {
+      callback(null);
+
+      this.position = position;
+      getService(Service.WindowCovering).getCharacteristic(Characteristic.CurrentPosition).setValue(this.position);
+  }
 }
 
 function getPositionState(callback) {
   callback(null, this.positionState);
 }
 
-// Characteristic.PositionState.DECREASING = 0;
-// Characteristic.PositionState.INCREASING = 1;
-// Characteristic.PositionState.STOPPED = 2;
-function setPositionState(position, callback) {
-  this.positionState = position;
-  callback(null);
-}
 
 function setOn(position, callback) {
   if (!this.gateway) {
@@ -322,12 +314,16 @@ function setOn(position, callback) {
   this.log.info("Setting " + this.name + " to " + position === true ? "on" : "off");
   this.gateway.setValue(this.context.channel, position, false, function(err, res) {
       if (err) {
-          this.log.warn("Error setting " + this.name + " to " + position === true ? "on" : "off" + ": " + err);
+          this.log.warn("Error setting " + this.name + " to " + position ? "on" : "off" + ": " + err);
           callback(err);
       }
       else {
-          this.log.info("Succeeded setting " + this.name + " to " + position === true ? "on" : "off" + ": " + JSON.stringify(res));
+          this.log.info("Succeeded setting " + this.name + " to " + position ? "on" : "off" + ": " + JSON.stringify(res));
           callback(null);
+          if (position && this.context.duration) {
+              var service = this.getService(Service.Lightbulb) || this.getService(Service.Switch);
+              if (service) setTimeout(function() {
+                  service.getCharacteristic(Characteristic.On).setValue(false);}, this.context.duration * 1ß00);
       }
   }.bind(this));
 }

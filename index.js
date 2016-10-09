@@ -97,7 +97,7 @@ eNetPlatform.prototype.setupDevices = function() {
 
                         var a = this.findAccessory(g.id, acc.channel);
                         if (a) {
-                            if (a.context.type != acc.type) {
+                            if ((a.context.type != acc.type) || (a.context.name != acc.name)){
                                 // kick this accessory out, create new one
                                 a.reachable = false;
                             }
@@ -170,7 +170,7 @@ eNetPlatform.prototype.createAccessory = function(gate, conf) {
 
     this.log.info("Creating accessory: " + JSON.stringify(conf));
 
-    uuid = UUIDGen.generate(JSON.stringify(conf));
+    uuid = UUIDGen.generate(JSON.stringify(conf) + gate.id);
 
     var accessory = new Accessory(conf.name, uuid);
 
@@ -191,6 +191,7 @@ eNetPlatform.prototype.createAccessory = function(gate, conf) {
     accessory.context.gateID = gate.id;
     accessory.context.type = conf.type;
     accessory.context.channel = conf.channel;
+    accessory.context.name = conf.name;
 
     if (this.setupAccessory(accessory)) {
         accessory.reachable = true;
@@ -276,18 +277,18 @@ function setTargetPosition(position, callback) {
   }
 
   if (position == 100 || position == 0) {
-      this.log.info("Setting " + this.name + " to " + position);
+      this.log.info("Setting " + this.context.name + " to " + position);
       this.gateway.setValue(this.context.channel, position == 100, true, function(err, res) {
           if (err) {
-              this.log.warn("Error setting " + this.name + " to " + position + ": " + err);
+              this.log.warn("Error setting " + this.context.name + " to " + position + ": " + err);
               callback(err);
           }
           else {
-              this.log.info("Succeeded setting " + this.name + " to " + position + " : " + JSON.stringify(res));
-              callback(null);
-
+              this.log.info("Succeeded setting " + this.context.name + " to " + position + " : " + JSON.stringify(res));
               this.position = position;
-              getService(Service.WindowCovering).getCharacteristic(Characteristic.CurrentPosition).setValue(this.position);
+              this.getService(Service.WindowCovering).getCharacteristic(Characteristic.CurrentPosition).setValue(this.position);
+
+              callback(null);
           }
       }.bind(this));
   }
@@ -295,7 +296,7 @@ function setTargetPosition(position, callback) {
       callback(null);
 
       this.position = position;
-      getService(Service.WindowCovering).getCharacteristic(Characteristic.CurrentPosition).setValue(this.position);
+      this.getService(Service.WindowCovering).getCharacteristic(Characteristic.CurrentPosition).setValue(this.position);
   }
 }
 
@@ -311,14 +312,14 @@ function setOn(position, callback) {
     return;
   }
 
-  this.log.info("Setting " + this.name + " to " + position === true ? "on" : "off");
+  this.log.info("Setting " + this.context.name + " to " + position === true ? "on" : "off");
   this.gateway.setValue(this.context.channel, position, false, function(err, res) {
       if (err) {
-          this.log.warn("Error setting " + this.name + " to " + position ? "on" : "off" + ": " + err);
+          this.log.warn("Error setting " + this.context.name + " to " + position ? "on" : "off" + ": " + err);
           callback(err);
       }
       else {
-          this.log.info("Succeeded setting " + this.name + " to " + position ? "on" : "off" + ": " + JSON.stringify(res));
+          this.log.info("Succeeded setting " + this.context.name + " to " + position ? "on" : "off" + ": " + JSON.stringify(res));
           callback(null);
           if (position && this.context.duration) {
               var service = this.getService(Service.Lightbulb) || this.getService(Service.Switch);

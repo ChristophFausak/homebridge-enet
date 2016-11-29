@@ -97,7 +97,7 @@ eNetPlatform.prototype.setupDevices = function() {
 
                         var a = this.findAccessory(g.id, acc.channel);
                         if (a) {
-                            if ((a.context.type != acc.type) || (a.context.name != acc.name)){
+                            if ((a.context.type != acc.type) || (a.context.name != acc.name)) {
                                 // kick this accessory out, create new one
                                 a.reachable = false;
                             }
@@ -110,9 +110,8 @@ eNetPlatform.prototype.setupDevices = function() {
                                 }
                             }
                         }
-                        else {
-                            this.createAccessory(g, acc);
-                        }
+
+                        if (!a || !a.reachable) this.createAccessory(g, acc);
                     }
                 }
                 else this.log.warn("Cannot find gateway: " + JSON.stringify(gw));
@@ -209,13 +208,11 @@ eNetPlatform.prototype.setupAccessory = function(accessory) {
     if (service = accessory.getService(Service.Lightbulb)) {
         service
           .getCharacteristic(Characteristic.On)
-//          .on('get', getCurrentPosition.bind(accessory))
           .on('set', setOn.bind(accessory));
     }
     else if (service = accessory.getService(Service.Switch)) {
         service
           .getCharacteristic(Characteristic.On)
-//          .on('get', getCurrentPosition.bind(accessory))
           .on('set', setOn.bind(accessory));
     }
     else if (service = accessory.getService(Service.WindowCovering)) {
@@ -276,27 +273,36 @@ function setTargetPosition(position, callback) {
     return;
   }
 
+  callback(null);
   if (position == 100 || position == 0) {
       this.log.info("Setting " + this.context.name + " to " + position);
+
+      this.position = position == 100 ? Characteristic.PositionState.DECREASING : Characteristic.PositionState.INCREASING;
+      this.getService(Service.WindowCovering).setCharacteristic(Characteristic.CurrentPosition, this.position);
+
       this.gateway.setValue(this.context.channel, position == 100, true, function(err, res) {
           if (err) {
               this.log.warn("Error setting " + this.context.name + " to " + position + ": " + err);
-              callback(err);
+              //callback(err);
           }
           else {
               this.log.info("Succeeded setting " + this.context.name + " to " + position + " : " + JSON.stringify(res));
               this.position = position;
-              this.getService(Service.WindowCovering).getCharacteristic(Characteristic.CurrentPosition).setValue(this.position);
+              this.getService(Service.WindowCovering).setCharacteristic(Characteristic.CurrentPosition, this.position);
 
-              callback(null);
+              //callback(null);
           }
+
+          this.position = Characteristic.PositionState.STOPPED;
+          this.getService(Service.WindowCovering).setCharacteristic(Characteristic.CurrentPosition, this.position);
+
       }.bind(this));
   }
   else {
-      callback(null);
+      //callback(null);
 
       this.position = position;
-      this.getService(Service.WindowCovering).getCharacteristic(Characteristic.CurrentPosition).setValue(this.position);
+      this.getService(Service.WindowCovering).setCharacteristic(Characteristic.CurrentPosition, this.position);
   }
 }
 
@@ -313,14 +319,16 @@ function setOn(position, callback) {
   }
 
   this.log.info("Setting " + this.context.name + " to " + position === true ? "on" : "off");
+
+  callback(null);
   this.gateway.setValue(this.context.channel, position, false, function(err, res) {
       if (err) {
           this.log.warn("Error setting " + this.context.name + " to " + position ? "on" : "off" + ": " + err);
-          callback(err);
+          //callback(err);
       }
       else {
           this.log.info("Succeeded setting " + this.context.name + " to " + position ? "on" : "off" + ": " + JSON.stringify(res));
-          callback(null);
+          //callback(null);
           if (position && this.context.duration) {
               var service = this.getService(Service.Lightbulb) || this.getService(Service.Switch);
               if (service) {

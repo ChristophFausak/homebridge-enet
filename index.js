@@ -17,7 +17,6 @@ module.exports = function (homebridge) {
 function eNetPlatform(log, config, api) {
     this.log = log;
     this.config = config;
-    this.gateways = Array.isArray(config.gateways) ? config.gateways : [];
     this.accessories = [];
     this.gateways = [];
     this.loadState = 2; // didFinishLaunching & discover
@@ -274,36 +273,32 @@ function setTargetPosition(position, callback) {
   }
 
   callback(null);
-  if (position == 100 || position == 0) {
-      this.log.info("Setting " + this.context.name + " to " + position);
 
-      this.position = position == 100 ? Characteristic.PositionState.DECREASING : Characteristic.PositionState.INCREASING;
-      this.getService(Service.WindowCovering).setCharacteristic(Characteristic.CurrentPosition, this.position);
+  this.log.info("Setting " + this.context.name + " to " + position);
 
-      this.gateway.setValue(this.context.channel, position == 100, true, function(err, res) {
-          if (err) {
-              this.log.warn("Error setting " + this.context.name + " to " + position + ": " + err);
-              //callback(err);
-          }
-          else {
-              this.log.info("Succeeded setting " + this.context.name + " to " + position + " : " + JSON.stringify(res));
-              this.position = position;
-              this.getService(Service.WindowCovering).setCharacteristic(Characteristic.CurrentPosition, this.position);
+  if (position > 100) position = 0;
+  else position = 100 - position;
 
-              //callback(null);
-          }
+  if (this.position > position) this.positionState = Characteristic.PositionState.DECREASING
+  else this.positionState = Characteristic.PositionState.INCREASING;
 
-          this.position = Characteristic.PositionState.STOPPED;
+  this.position = position;
+
+  this.getService(Service.WindowCovering).setCharacteristic(Characteristic.CurrentPosition, this.position);
+
+  this.gateway.setValueBlind(this.context.channel, position, function(err, res) {
+      if (err) {
+          this.log.warn("Error setting " + this.context.name + " to " + this.position + ": " + err);
+          //callback(err);
+      }
+      else {
+          this.log.info("Succeeded setting " + this.context.name + " to " + this.position + " : " + JSON.stringify(res));
           this.getService(Service.WindowCovering).setCharacteristic(Characteristic.CurrentPosition, this.position);
 
-      }.bind(this));
-  }
-  else {
-      //callback(null);
-
-      this.position = position;
-      this.getService(Service.WindowCovering).setCharacteristic(Characteristic.CurrentPosition, this.position);
-  }
+          //callback(null);
+      }
+      this.positionState = Characteristic.PositionState.STOPPED;
+  }.bind(this));
 }
 
 function getPositionState(callback) {

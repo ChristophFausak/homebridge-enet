@@ -42,7 +42,7 @@ Configuration sample:
                          "duration": 120
                      },
                      {
-                         "channel": 17,
+                         "channel": 18,
                          "name": "Main Light",
                          "type": "Light",
                          "dimmable": true
@@ -61,9 +61,9 @@ Configuration sample:
 `gateways` is a list of gateways.
 
 For each gateway, you need to give an identification, which will be used to find the gateway on the network. You have three possibilities:
-1. `host` - if you provide a hostname or ip address that is the identification for the gateway.
-2. `mac` - you can specify the mac-address of the gateway, e.g. by running sampe-discovery.js from the homebridge-enet package.
-3. `name` - identify gateway by its name. You can set this name with the Jung/Gira eNet app. Factory default is "Mobile Gate"
+* `host` - if you provide a hostname or ip address that is the identification for the gateway.
+* `mac` - you can specify the mac-address of the gateway, e.g. by running sampe-discovery.js from the homebridge-enet package.
+* `name` - identify gateway by its name. You can set this name with the Jung/Gira eNet app. Factory default is "Mobile Gate"
 
 `accessories` is a list of defined accessories on the gateway. Every accessory has the following properies:
 * `channel` - The eNet channel assigned to the accessory.

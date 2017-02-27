@@ -18,6 +18,7 @@ function eNetPlatform(log, config, api) {
     this.log = log;
     this.config = config;
     this.accessories = [];
+    this.delAccessories = [];
     this.gateways = [];
     this.loadState = 2; // didFinishLaunching & discover
 
@@ -120,18 +121,19 @@ eNetPlatform.prototype.setupDevices = function() {
     }
     else this.log.warn("No gateways defined: " + JSOM.stringify(this.config));
 
-    var keep = [], del = [];
+    var keep = [];
     for (var i = 0; i < this.accessories.length; ++i) {
         var acc = this.accessories[i];
         if (acc.reachable) keep.push(acc);
         else {
             this.log.info("Deleting old accessory: " + JSON.stringify(acc.context));
-            del.push(acc);
+            this.delAccessories.push(acc);
         }
     }
 
+    if (this.delAccessories.length) this.api.unregisterPlatformAccessories("homebridge-eNet", "eNetPlatform", this.delAccessories);
+    this.delAccessories = [];
     this.accessories = keep;
-    if (del.length) this.api.unregisterPlatformAccessories("homebridge-eNet", "eNetPlatform", del);
 
     this.log.info("Platform initialization finishd: " + this.accessories.length + " accessories available.");
 }
@@ -168,12 +170,12 @@ eNetPlatform.prototype.createAccessory = function(gate, conf) {
 
     this.log.info("Creating accessory: " + JSON.stringify(conf));
 
-    uuid = UUIDGen.generate(JSON.stringify(conf) + gate.id);
+    uuid = UUIDGen.generate(JSON.stringify(conf) + gate.id + this.accessories.length);
 
     var accessory = new Accessory(conf.name, uuid);
 
     if (conf.type === "Shutter") {
-        accessory.addService(Service.WindowCovering, conf.name)
+        accessory.addService(Service.Window, conf.name)
     }
     else if (conf.type === "Light") {
         accessory.addService(Service.Lightbulb, conf.name)
@@ -204,6 +206,13 @@ eNetPlatform.prototype.setupAccessory = function(accessory) {
 
     accessory.log = this.log;
 
+    if (accessory.getService(Service.WindowCovering)) {
+        this.log.info("setupAccessory: Rejecting WindowCovering acessory" + accessory.context.name);
+
+        this.delAccessories.push(accessory);
+        return false;
+    }
+
     if (service = accessory.getService(Service.Lightbulb)) {
         service
           .getCharacteristic(Characteristic.On)
@@ -214,33 +223,31 @@ eNetPlatform.prototype.setupAccessory = function(accessory) {
           .getCharacteristic(Characteristic.On)
           .on('set', setOn.bind(accessory));
     }
-    else if (service = accessory.getService(Service.WindowCovering)) {
-        this.position = 0;
-        this.targetPosition = 0;
+    else if (service = accessory.getService(Service.Window)) {
+        accessory.position = 0;
+        accessory.targetPosition = 0;
+
+        service.setCharacteristic(Characteristic.CurrentPosition, accessory.position);
+        service.getCharacteristic(Characteristic.CurrentPosition)
+          .on('get', getCurrentPosition.bind(accessory));
+
+        service.setCharacteristic(Characteristic.TargetPosition, accessory.position);
+        service.getCharacteristic(Characteristic.TargetPosition)
+          .on('set', setTargetPosition.bind(accessory));
 
         // Characteristic.PositionState.DECREASING = 0;
         // Characteristic.PositionState.INCREASING = 1;
         // Characteristic.PositionState.STOPPED = 2;
-        this.positionState = Characteristic.PositionState.STOPPED;
+        accessory.positionState = Characteristic.PositionState.STOPPED;
 
-        service
-          .getCharacteristic(Characteristic.CurrentPosition)
-          .on('get', getCurrentPosition.bind(accessory));
-
-        service
-          .getCharacteristic(Characteristic.TargetPosition)
-          .on('get', getTargetPosition.bind(accessory))
-          .on('set', setTargetPosition.bind(accessory));
-
-        service
-          .getCharacteristic(Characteristic.PositionState)
-          .on('get', getPositionState.bind(accessory))
-          .setValue(this.positionState);
-
+        service.setCharacteristic(Characteristic.PositionState, accessory.positionState);
+        service.getCharacteristic(Characteristic.PositionState)
+          .on('get', getPositionState.bind(accessory));
     }
     else
     {
         this.log.warn("Cannot configure accessory, no service found. " + JSON.stringify(accessory.context));
+        this.delAccessories.push(accessory);
         return false;
     }
 
@@ -258,10 +265,7 @@ eNetPlatform.prototype.setupAccessory = function(accessory) {
 //
 
 function getCurrentPosition(callback) {
-  callback(null, this.position);
-}
-
-function getTargetPosition(callback) {
+  this.log.info("getCurrentPosition " + this.context.name + ": " + this.position);
   callback(null, this.position);
 }
 
@@ -272,36 +276,37 @@ function setTargetPosition(position, callback) {
     return;
   }
 
-  callback(null);
-
   this.log.info("Setting " + this.context.name + " to " + position);
-
-  if (position > 100) position = 0;
-  else position = 100 - position;
 
   if (this.position > position) this.positionState = Characteristic.PositionState.DECREASING
   else this.positionState = Characteristic.PositionState.INCREASING;
 
   this.position = position;
 
-  this.getService(Service.WindowCovering).setCharacteristic(Characteristic.CurrentPosition, this.position);
+  this.getService(Service.Window).setCharacteristic(Characteristic.CurrentPosition, this.position);
+  this.getService(Service.Window).setCharacteristic(Characteristic.PositionState, this.positionState);
 
-  this.gateway.setValueBlind(this.context.channel, position, function(err, res) {
+  callback(null);
+
+  this.gateway.setValueBlind(this.context.channel, 100 - position, function(err, res) {
       if (err) {
           this.log.warn("Error setting " + this.context.name + " to " + this.position + ": " + err);
           //callback(err);
       }
       else {
           this.log.info("Succeeded setting " + this.context.name + " to " + this.position + " : " + JSON.stringify(res));
-          this.getService(Service.WindowCovering).setCharacteristic(Characteristic.CurrentPosition, this.position);
+          // this.getService(Service.Window).setCharacteristic(Characteristic.CurrentPosition, this.position);
 
           //callback(null);
       }
-      this.positionState = Characteristic.PositionState.STOPPED;
   }.bind(this));
+
+  this.positionState = Characteristic.PositionState.STOPPED;
+  this.getService(Service.Window).setCharacteristic(Characteristic.PositionState, this.positionState);
 }
 
 function getPositionState(callback) {
+  this.log.info("getPositionState " + this.context.name + ": " + this.positionState);
   callback(null, this.positionState);
 }
 

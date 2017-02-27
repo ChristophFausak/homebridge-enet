@@ -103,6 +103,7 @@ eNetPlatform.prototype.setupDevices = function() {
                             }
                             else {
                                 a.context.duration = acc.duration;
+                                a.context.dimmable = acc.dimmable;
 
                                 if (!a.reachable) {
                                     a.gateway = g;
@@ -124,7 +125,25 @@ eNetPlatform.prototype.setupDevices = function() {
     var keep = [];
     for (var i = 0; i < this.accessories.length; ++i) {
         var acc = this.accessories[i];
-        if (acc.reachable) keep.push(acc);
+        if (acc.reachable) {
+            keep.push(acc);
+
+            var service;
+            if (service = acc.getService(Service.Lightbulb)) {
+                if (acc.context.dimmable) {
+                    this.log.info("Configuring brightness for " + acc.context.name);
+                    acc.brightness = 100;
+
+                    service.getCharacteristic(Characteristic.Brightness)
+                      .on('get', getBrightness.bind(acc))
+                      .on('set', setBrightness.bind(acc));
+                } else {
+                    service.removeCharacteristic(Characteristic.Brightness);
+                }
+            }
+            if (acc.context.type  === "Light") {
+            }
+        }
         else {
             this.log.info("Deleting old accessory: " + JSON.stringify(acc.context));
             this.delAccessories.push(acc);
@@ -192,6 +211,8 @@ eNetPlatform.prototype.createAccessory = function(gate, conf) {
     accessory.context.type = conf.type;
     accessory.context.channel = conf.channel;
     accessory.context.name = conf.name;
+    accessory.context.duration = conf.duration;
+    accessory.context.dimmable = conf.dimmable;
 
     if (this.setupAccessory(accessory)) {
         accessory.reachable = true;
@@ -336,6 +357,31 @@ function setOn(position, callback) {
                   service.getCharacteristic(Characteristic.On).setValue(false);}, this.context.duration * 1000);
               }
           }
+      }
+  }.bind(this));
+}
+
+
+function getBrightness(callback) {
+  this.log.info("getBrightness " + this.context.name + ": " + this.brightness);
+  callback(null, this.brightness);
+}
+
+function setBrightness(brightness, callback) {
+  this.log.info("setBrightness " + this.context.name + ": " + brightness);
+  callback(null);
+
+  this.brightness = brightness;
+
+  this.gateway.setValueDim(this.context.channel, brightness, function(err, res) {
+      if (err) {
+          this.log.warn("Error setting " + this.context.name + " to " + this.brightness + ": " + err);
+          //callback(err);
+      }
+      else {
+          this.log.info("Succeeded setting " + this.context.name + " to " + this.brightness + " : " + JSON.stringify(res));
+
+          //callback(null);
       }
   }.bind(this));
 }

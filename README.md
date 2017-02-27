@@ -33,8 +33,19 @@ Configuration sample:
                      {
                          "channel": 16,
                          "name": "Kitchen",
-                         "type": "Shutter",
+                         "type": "Shutter"
+                     },
+                     {
+                         "channel": 17,
+                         "name": "Toaster",
+                         "type": "Switch",
                          "duration": 120
+                     },
+                     {
+                         "channel": 17,
+                         "name": "Main Light",
+                         "type": "Light",
+                         "dimmable": true
                      }
                  ]
              }]
@@ -58,10 +69,11 @@ For each gateway, you need to give an identification, which will be used to find
 * `channel` - The eNet channel assigned to the accessory.
 * `name` - The HomeKit name of the accessory.
 * `type` - Type of accessory. Currently supported:
-    * `Shutter` - Window covering accessory. You can set the target position.
+    * `Shutter` - Window accessory. You can set the target position.
     * `Switch` - An on/off switch.
     * `Light` - Same as `Switch`, but with a Lightbulb icon on Homekit.
 * `duration` - **optional** When the accessory is switched on, it will be automatically switched off after `duration` seconds. Only for `Switch` and `Light` accessories.
+* `dimmable` - **optional** Only for `Light` accessories.
 
 
 
